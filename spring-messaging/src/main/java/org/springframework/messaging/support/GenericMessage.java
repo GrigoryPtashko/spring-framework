@@ -41,6 +41,8 @@ public class GenericMessage<T> implements Message<T>, Serializable {
 
 	private final MessageHeaders headers;
 
+	private final Map<String, Object> auxParameters;
+
 
 	/**
 	 * Create a new message with the given payload.
@@ -72,6 +74,15 @@ public class GenericMessage<T> implements Message<T>, Serializable {
 		Assert.notNull(headers, "MessageHeaders must not be null");
 		this.payload = payload;
 		this.headers = headers;
+		this.auxParameters = null;
+	}
+
+	public GenericMessage(T payload, MessageHeaders headers, Map<String, Object> auxParameters) {
+		Assert.notNull(payload, "Payload must not be null");
+		Assert.notNull(headers, "MessageHeaders must not be null");
+		this.payload = payload;
+		this.headers = headers;
+		this.auxParameters = auxParameters;
 	}
 
 
@@ -83,6 +94,9 @@ public class GenericMessage<T> implements Message<T>, Serializable {
 		return this.headers;
 	}
 
+	public Map<String, Object> getAuxParameters() {
+		return auxParameters;
+	}
 
 	public boolean equals(Object other) {
 		if (this == other) {

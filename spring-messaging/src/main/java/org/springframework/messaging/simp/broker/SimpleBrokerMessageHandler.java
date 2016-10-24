@@ -28,6 +28,7 @@ import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.SubscribableChannel;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessageType;
+import org.springframework.messaging.support.GenericMessage;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.messaging.support.MessageHeaderInitializer;
@@ -335,7 +336,14 @@ public class SimpleBrokerMessageHandler extends AbstractBrokerMessageHandler {
 				headerAccessor.setSubscriptionId(subscriptionId);
 				headerAccessor.copyHeadersIfAbsent(message.getHeaders());
 				Object payload = message.getPayload();
-				Message<?> reply = MessageBuilder.createMessage(payload, headerAccessor.getMessageHeaders());
+				Message<?> reply;
+				if (message instanceof GenericMessage) {
+					reply = MessageBuilder.createMessage(
+						payload, headerAccessor.getMessageHeaders(), ((GenericMessage<?>) message).getAuxParameters());
+				} else {
+					reply = MessageBuilder.createMessage(payload, headerAccessor.getMessageHeaders());
+
+				}
 				try {
 					getClientOutboundChannel().send(reply);
 				}

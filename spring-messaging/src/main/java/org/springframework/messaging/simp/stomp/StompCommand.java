@@ -65,7 +65,7 @@ public enum StompCommand {
 	private static Collection<StompCommand> destinationRequired = Arrays.asList(SEND, SUBSCRIBE, MESSAGE);
 	private static Collection<StompCommand> subscriptionIdRequired = Arrays.asList(SUBSCRIBE, UNSUBSCRIBE, MESSAGE);
 	private static Collection<StompCommand> contentLengthRequired = Arrays.asList(SEND, MESSAGE, ERROR);
-	private static Collection<StompCommand> bodyAllowed = Arrays.asList(SEND, MESSAGE, ERROR);
+	private static Collection<StompCommand> bodyAllowed = Arrays.asList(SEND, MESSAGE, ERROR, SUBSCRIBE);
 
 
 

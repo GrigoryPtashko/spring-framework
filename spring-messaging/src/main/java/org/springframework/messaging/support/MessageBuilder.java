@@ -188,13 +188,19 @@ public final class MessageBuilder<T> {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T> Message<T> createMessage(T payload, MessageHeaders messageHeaders) {
+		return createMessage(payload, messageHeaders, null);
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <T> Message<T> createMessage(
+		T payload, MessageHeaders messageHeaders, Map<String, Object> auxParameters) {
 		Assert.notNull(payload, "Payload must not be null");
 		Assert.notNull(messageHeaders, "MessageHeaders must not be null");
 		if (payload instanceof Throwable) {
 			return (Message<T>) new ErrorMessage((Throwable) payload, messageHeaders);
 		}
 		else {
-			return new GenericMessage<T>(payload, messageHeaders);
+			return new GenericMessage<T>(payload, messageHeaders, auxParameters);
 		}
 	}
 
