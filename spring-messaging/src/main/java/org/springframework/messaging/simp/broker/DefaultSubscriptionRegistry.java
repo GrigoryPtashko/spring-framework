@@ -16,6 +16,7 @@
 
 package org.springframework.messaging.simp.broker;
 
+import java.security.Principal;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -38,6 +39,7 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.messaging.support.GenericMessage;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.util.Assert;
@@ -156,7 +158,8 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 				}
 			}
 		}
-		this.subscriptionRegistry.addSubscription(sessionId, subsId, destination, expression);
+    Principal user = SimpMessageHeaderAccessor.wrap(message).getUser();
+		this.subscriptionRegistry.addSubscription(sessionId, subsId, destination, expression, user);
 		this.destinationCache.updateAfterNewSubscription(destination, sessionId, subsId);
 	}
 
@@ -185,12 +188,18 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 		return filterSubscriptions(result, message);
 	}
 
+  @SuppressWarnings("unchecked")
 	private MultiValueMap<String, String> filterSubscriptions(
 			MultiValueMap<String, String> allMatches, Message<?> message) {
 
-		if (!this.selectorHeaderInUse) {
+		if (!this.selectorHeaderInUse && 
+        (!(message instanceof GenericMessage) ||
+         ((GenericMessage) message).getAuxParameters() == null ||
+         ((GenericMessage) message).getAuxParameters().size() == 0 ||
+         !((GenericMessage) message).getAuxParameters().containsKey(SimpMessageHeaderAccessor.USER_HEADER))) {
 			return allMatches;
 		}
+
 		EvaluationContext context = null;
 		MultiValueMap<String, String> result = new LinkedMultiValueMap<String, String>(allMatches.size());
 		for (String sessionId : allMatches.keySet()) {
@@ -203,9 +212,34 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 				if (sub == null) {
 					continue;
 				}
+
+        boolean userAllowed = true;
+        if (message instanceof GenericMessage &&
+            info.getUser() != null &&
+            ((GenericMessage) message).getAuxParameters() != null &&
+            ((GenericMessage) message).getAuxParameters().containsKey(SimpMessageHeaderAccessor.USER_HEADER) &&
+            ((GenericMessage) message).getAuxParameters().get(SimpMessageHeaderAccessor.USER_HEADER) instanceof Set) {
+          if (info.getUser() == null) {
+            userAllowed = false;
+          } else {
+            Set<Object> allowedUsers = (Set<Object>) ((GenericMessage) message).getAuxParameters().get(SimpMessageHeaderAccessor.USER_HEADER);
+            userAllowed = allowedUsers.contains(info.getUser().getName());
+          }
+        }
+        if (!this.selectorHeaderInUse) {
+          if (userAllowed) {
+            result.add(sessionId, subId);
+          }
+
+          continue;
+        }
+
 				Expression expression = sub.getSelectorExpression();
 				if (expression == null) {
-					result.add(sessionId, subId);
+					if (userAllowed) {
+            result.add(sessionId, subId);
+          }
+
 					continue;
 				}
 				if (context == null) {
@@ -213,7 +247,7 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 					context.getPropertyAccessors().add(new SimpMessageHeaderPropertyAccessor());
 				}
 				try {
-					if (expression.getValue(context, boolean.class)) {
+					if (expression.getValue(context, boolean.class) && userAllowed) {
 						result.add(sessionId, subId);
 					}
 				}
@@ -373,11 +407,11 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 		}
 
 		public SessionSubscriptionInfo addSubscription(String sessionId, String subscriptionId,
-				String destination, Expression selectorExpression) {
+				String destination, Expression selectorExpression, Principal user) {
 
 			SessionSubscriptionInfo info = this.sessions.get(sessionId);
 			if (info == null) {
-				info = new SessionSubscriptionInfo(sessionId);
+				info = new SessionSubscriptionInfo(sessionId, user);
 				SessionSubscriptionInfo value = this.sessions.putIfAbsent(sessionId, info);
 				if (value != null) {
 					info = value;
@@ -404,6 +438,7 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 	private static class SessionSubscriptionInfo {
 
 		private final String sessionId;
+    private final Principal user;
 
 		// destination -> subscriptions
 		private final Map<String, Set<Subscription>> destinationLookup =
@@ -412,6 +447,13 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 		public SessionSubscriptionInfo(String sessionId) {
 			Assert.notNull(sessionId, "sessionId must not be null");
 			this.sessionId = sessionId;
+      this.user = null;
+		}
+
+		public SessionSubscriptionInfo(String sessionId, Principal user) {
+			Assert.notNull(sessionId, "sessionId must not be null");
+			this.sessionId = sessionId;
+			this.user = user;
 		}
 
 		public String getSessionId() {
@@ -425,6 +467,10 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 		public Set<Subscription> getSubscriptions(String destination) {
 			return this.destinationLookup.get(destination);
 		}
+
+    public Principal getUser() {
+      return this.user;
+    }
 
 		public Subscription getSubscription(String subscriptionId) {
 			for (String destination : this.destinationLookup.keySet()) {

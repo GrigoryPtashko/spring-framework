@@ -340,9 +340,9 @@ public class SimpleBrokerMessageHandler extends AbstractBrokerMessageHandler {
 				if (message instanceof GenericMessage) {
 					reply = MessageBuilder.createMessage(
 						payload, headerAccessor.getMessageHeaders(), ((GenericMessage<?>) message).getAuxParameters());
-				} else {
+				}
+        else {
 					reply = MessageBuilder.createMessage(payload, headerAccessor.getMessageHeaders());
-
 				}
 				try {
 					getClientOutboundChannel().send(reply);
